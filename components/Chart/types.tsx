@@ -44,6 +44,14 @@ export interface Anchor {
   price: number;
 }
 
+export type LinePattern = "solid" | "dashed" | "dotted";
+export type LineWidth = 1 | 2 | 3;
+
+export interface LineStyle {
+  pattern: LinePattern;
+  width: LineWidth;
+}
+
 interface DrawingBase {
   id: string;
   kind: DrawingTool;
@@ -53,11 +61,13 @@ export interface TrendDrawing extends DrawingBase {
   kind: "trend";
   a: Anchor;
   b: Anchor;
+  style: LineStyle;
 }
 
 export interface HorizontalDrawing extends DrawingBase {
   kind: "horizontal";
   price: number;
+  style: LineStyle;
 }
 
 export interface RectDrawing extends DrawingBase {

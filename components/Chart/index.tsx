@@ -10,7 +10,7 @@ import ReplayBar from "./ReplayBar";
 import LeftToolbar from "./LeftToolbar";
 import DrawingOverlay from "./DrawingOverlay";
 import { generateMockCandles } from "./utils";
-import { Drawing, DrawingTool, Timeframe, WatchlistItem } from "./types";
+import { Drawing, DrawingTool, LineStyle, Timeframe, WatchlistItem } from "./types";
 import { WATCHLIST_SECTIONS } from "./constants";
 
 const ALL_ITEMS = WATCHLIST_SECTIONS.flatMap((s) => s.items);
@@ -34,6 +34,26 @@ export default function Chart() {
   const [drawings, setDrawings] = useState<Drawing[]>([]);
   const [selectedDrawingId, setSelectedDrawingId] = useState<string | null>(null);
   const [redrawTick, setRedrawTick] = useState(0);
+  const [trendStyle, setTrendStyle] = useState<LineStyle>({ pattern: "solid", width: 2 });
+  const [horizontalStyle, setHorizontalStyle] = useState<LineStyle>({
+    pattern: "dashed",
+    width: 2,
+  });
+
+  const handleStyleChange = useCallback(
+    (tool: "trend" | "horizontal", style: LineStyle) => {
+      if (tool === "trend") setTrendStyle(style);
+      else setHorizontalStyle(style);
+      setDrawings((ds) =>
+        ds.map((d) =>
+          d.id === selectedDrawingId && (d.kind === "trend" || d.kind === "horizontal") && d.kind === tool
+            ? ({ ...d, style } as Drawing)
+            : d
+        )
+      );
+    },
+    [selectedDrawingId]
+  );
 
   const apiRef = useRef<ChartCoordinateApi | null>(null);
 
@@ -118,6 +138,9 @@ export default function Chart() {
             setDrawings([]);
             setSelectedDrawingId(null);
           }}
+          trendStyle={trendStyle}
+          horizontalStyle={horizontalStyle}
+          onStyleChange={handleStyleChange}
         />
         <div className="relative flex-1 flex">
           <ChartArea
@@ -135,7 +158,12 @@ export default function Chart() {
               drawings={drawings}
               activeTool={activeTool}
               selectedId={selectedDrawingId}
+              trendStyle={trendStyle}
+              horizontalStyle={horizontalStyle}
               onAdd={(d) => setDrawings((ds) => [...ds, d])}
+              onUpdate={(d) =>
+                setDrawings((ds) => ds.map((x) => (x.id === d.id ? d : x)))
+              }
               onSelect={setSelectedDrawingId}
               onToolFinished={() => setActiveTool(null)}
               redrawTick={redrawTick}
