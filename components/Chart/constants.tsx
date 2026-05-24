@@ -1,14 +1,22 @@
 import { SymbolInfo, Timeframe, WatchlistSection } from "./types";
 
 export const TIMEFRAMES: { label: string; value: Timeframe }[] = [
-  { label: "3m", value: "3m" },
-  { label: "5m", value: "5m" },
-  { label: "15m", value: "15m" },
-  { label: "30m", value: "30m" },
   { label: "1h", value: "1h" },
   { label: "4h", value: "4h" },
   { label: "D", value: "D" },
 ];
+
+import type { ApiTimeframe } from "@/lib/api";
+
+export const TIMEFRAME_TO_API: Record<Timeframe, ApiTimeframe> = {
+  "3m": "1h",
+  "5m": "1h",
+  "15m": "1h",
+  "30m": "1h",
+  "1h": "1h",
+  "4h": "4h",
+  D: "1day",
+};
 
 export const WATCHLIST_SECTIONS: WatchlistSection[] = [
   { name: "INDICES", expanded: false, items: [] },

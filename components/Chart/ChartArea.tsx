@@ -13,6 +13,34 @@ import {
 } from "lightweight-charts";
 import { Candle } from "./types";
 import { computeSMA } from "./utils";
+import { useTheme } from "@/lib/theme";
+
+const PALETTES = {
+  dark: {
+    background: "#131722",
+    text: "#d1d4dc",
+    grid: "#1e222d",
+    border: "#2a2e39",
+    line: "#5b8def",
+    up: "#26a69a",
+    down: "#ef5350",
+    upVolume: "rgba(38, 166, 154, 0.5)",
+    downVolume: "rgba(239, 83, 80, 0.5)",
+    dimOverlay: "rgba(19, 23, 34, 0.6)",
+  },
+  light: {
+    background: "#ffffff",
+    text: "#2a2e39",
+    grid: "#e6e9ef",
+    border: "#d8dde5",
+    line: "#2962ff",
+    up: "#089981",
+    down: "#e02e3a",
+    upVolume: "rgba(8, 153, 129, 0.45)",
+    downVolume: "rgba(224, 46, 58, 0.45)",
+    dimOverlay: "rgba(255, 255, 255, 0.55)",
+  },
+} as const;
 
 export interface ChartCoordinateApi {
   timeToX: (time: number) => number | null;
@@ -55,37 +83,40 @@ export default function ChartArea({
   const [lineX, setLineX] = useState<number | null>(null);
   const [dragging, setDragging] = useState(false);
 
+  const { theme } = useTheme();
+  const palette = PALETTES[theme];
+
   useEffect(() => {
     if (!containerRef.current) return;
 
     const chart = createChart(containerRef.current, {
-      layout: { background: { color: "#131722" }, textColor: "#d1d4dc" },
+      layout: { background: { color: palette.background }, textColor: palette.text },
       grid: {
-        vertLines: { color: "#1e222d" },
-        horzLines: { color: "#1e222d" },
+        vertLines: { color: palette.grid },
+        horzLines: { color: palette.grid },
       },
       crosshair: { mode: CrosshairMode.Normal },
       rightPriceScale: {
-        borderColor: "#2a2e39",
+        borderColor: palette.border,
         scaleMargins: { top: 0.05, bottom: 0.25 },
       },
-      timeScale: { borderColor: "#2a2e39" },
+      timeScale: { borderColor: palette.border },
       width: containerRef.current.clientWidth,
       height: containerRef.current.clientHeight,
     });
     chartRef.current = chart;
 
     candleSeriesRef.current = chart.addSeries(CandlestickSeries, {
-      upColor: "#26a69a",
-      downColor: "#ef5350",
-      borderUpColor: "#26a69a",
-      borderDownColor: "#ef5350",
-      wickUpColor: "#26a69a",
-      wickDownColor: "#ef5350",
+      upColor: palette.up,
+      downColor: palette.down,
+      borderUpColor: palette.up,
+      borderDownColor: palette.down,
+      wickUpColor: palette.up,
+      wickDownColor: palette.down,
     });
 
     smaSeriesRef.current = chart.addSeries(LineSeries, {
-      color: "#5b8def",
+      color: palette.line,
       lineWidth: 1,
       priceLineVisible: false,
       lastValueVisible: false,
@@ -162,6 +193,9 @@ export default function ChartArea({
 
   useEffect(() => {
     if (!candleSeriesRef.current || !smaSeriesRef.current || !volumeSeriesRef.current) return;
+    const chart = chartRef.current;
+
+    const savedRange = chart?.timeScale().getVisibleLogicalRange() ?? null;
 
     const slice = candles.slice(0, Math.max(1, visibleCount));
 
@@ -186,12 +220,39 @@ export default function ChartArea({
       slice.map((c) => ({
         time: (new Date(c.time).getTime() / 1000) as UTCTimestamp,
         value: c.volume,
-        color: c.close >= c.open ? "rgba(38, 166, 154, 0.5)" : "rgba(239, 83, 80, 0.5)",
+        color: c.close >= c.open ? palette.upVolume : palette.downVolume,
       }))
     );
 
+    if (chart && savedRange) {
+      chart.timeScale().setVisibleLogicalRange(savedRange);
+    }
+
     onRangeChange?.();
-  }, [candles, visibleCount, onRangeChange]);
+  }, [candles, visibleCount, onRangeChange, palette]);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    chart.applyOptions({
+      layout: { background: { color: palette.background }, textColor: palette.text },
+      grid: {
+        vertLines: { color: palette.grid },
+        horzLines: { color: palette.grid },
+      },
+      rightPriceScale: { borderColor: palette.border },
+      timeScale: { borderColor: palette.border },
+    });
+    candleSeriesRef.current?.applyOptions({
+      upColor: palette.up,
+      downColor: palette.down,
+      borderUpColor: palette.up,
+      borderDownColor: palette.down,
+      wickUpColor: palette.up,
+      wickDownColor: palette.down,
+    });
+    smaSeriesRef.current?.applyOptions({ color: palette.line });
+  }, [palette]);
 
   useEffect(() => {
     if (!replayActive) {
@@ -241,7 +302,7 @@ export default function ChartArea({
   const containerWidth = containerRef.current?.clientWidth ?? 0;
 
   return (
-    <div className="relative flex-1 bg-[#131722] select-none" style={cursor ? { cursor } : undefined}>
+    <div className="relative flex-1 bg-bg select-none" style={cursor ? { cursor } : undefined}>
       <div ref={containerRef} className="absolute inset-0" />
 
       {children}
@@ -249,8 +310,12 @@ export default function ChartArea({
       {replayActive && lineX != null && (
         <>
           <div
-            className="absolute top-0 bottom-0 bg-[#131722]/60 pointer-events-none z-10"
-            style={{ left: dimRightX, width: Math.max(0, containerWidth - dimRightX) }}
+            className="absolute top-0 bottom-0 pointer-events-none z-10"
+            style={{
+              left: dimRightX,
+              width: Math.max(0, containerWidth - dimRightX),
+              backgroundColor: palette.dimOverlay,
+            }}
           />
           <div
             className="absolute top-0 bottom-0 z-20"
@@ -261,14 +326,14 @@ export default function ChartArea({
               updateFromClientX(e.clientX);
             }}
           >
-            <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-px bg-[#2962ff]" />
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-8 rounded bg-[#2962ff] flex items-center justify-center shadow-lg">
+            <div className="absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-px bg-accent" />
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-8 rounded bg-accent flex items-center justify-center shadow-lg">
               <svg width="6" height="10" viewBox="0 0 6 10" fill="white">
                 <rect x="1" y="0" width="1" height="10" />
                 <rect x="4" y="0" width="1" height="10" />
               </svg>
             </div>
-            <div className="absolute -top-1 left-1/2 -translate-x-1/2 bg-[#2962ff] text-white text-[10px] font-medium px-1.5 py-0.5 rounded whitespace-nowrap pointer-events-none">
+            <div className="absolute -top-1 left-1/2 -translate-x-1/2 bg-accent text-white text-[10px] font-medium px-1.5 py-0.5 rounded whitespace-nowrap pointer-events-none">
               Drag to start
             </div>
           </div>

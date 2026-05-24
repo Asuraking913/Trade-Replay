@@ -4,6 +4,30 @@ import { useEffect, useRef, useState, type RefObject } from "react";
 import { Anchor, Drawing, DrawingTool, LineStyle } from "./types";
 import { ChartCoordinateApi } from "./ChartArea";
 import { FIB_LEVELS } from "./constants";
+import { useTheme } from "@/lib/theme";
+
+const OVERLAY_PALETTES = {
+  dark: {
+    accent: "#2962ff",
+    line: "#5b8def",
+    up: "#26a69a",
+    down: "#ef5350",
+    badgeBg: "#1e222d",
+    badgeBorder: "#2a2e39",
+    badgeText: "#ffffff",
+  },
+  light: {
+    accent: "#2962ff",
+    line: "#2962ff",
+    up: "#089981",
+    down: "#e02e3a",
+    badgeBg: "#ffffff",
+    badgeBorder: "#d8dde5",
+    badgeText: "#131722",
+  },
+} as const;
+
+type OverlayPalette = (typeof OVERLAY_PALETTES)[keyof typeof OVERLAY_PALETTES];
 
 interface DrawingOverlayProps {
   apiRef: RefObject<ChartCoordinateApi | null>;
@@ -51,6 +75,8 @@ export default function DrawingOverlay({
   const [draft, setDraft] = useState<Draft | null>(null);
   const [edit, setEdit] = useState<EditAction | null>(null);
   const [, setInternalTick] = useState(0);
+  const { theme } = useTheme();
+  const palette = OVERLAY_PALETTES[theme];
 
   void redrawTick;
   const api = apiRef.current;
@@ -228,10 +254,11 @@ export default function DrawingOverlay({
             api={api}
             selected={d.id === selectedId}
             disabled={!!activeTool}
+            palette={palette}
             onBeginEdit={(e, role) => beginEdit(e, d, role)}
           />
         ))}
-      {api && draft && <DraftShape draft={draft} api={api} />}
+      {api && draft && <DraftShape draft={draft} api={api} palette={palette} />}
     </svg>
   );
 }
@@ -308,10 +335,13 @@ interface ShapeProps {
   api: ChartCoordinateApi;
   selected: boolean;
   disabled: boolean;
+  palette: OverlayPalette;
   onBeginEdit: (e: React.PointerEvent<SVGElement>, role: EditRole) => void;
 }
 
-function DrawingShape({ drawing, api, selected, disabled, onBeginEdit }: ShapeProps) {
+function DrawingShape({ drawing, api, selected, disabled, palette, onBeginEdit }: ShapeProps) {
+  const strokeAccent = palette.accent;
+  const strokeIdle = palette.line;
   const bodyCursor = disabled ? "default" : "move";
   const bodyHandlers = disabled
     ? {}
@@ -346,7 +376,7 @@ function DrawingShape({ drawing, api, selected, disabled, onBeginEdit }: ShapePr
             y1={ay}
             x2={bx}
             y2={by}
-            stroke={selected ? "#2962ff" : "#5b8def"}
+            stroke={selected ? strokeAccent : strokeIdle}
             strokeWidth={stroke.strokeWidth}
             strokeDasharray={stroke.strokeDasharray}
             strokeLinecap="round"
@@ -383,7 +413,7 @@ function DrawingShape({ drawing, api, selected, disabled, onBeginEdit }: ShapePr
             y1={y}
             x2={api.width}
             y2={y}
-            stroke={selected ? "#2962ff" : "#5b8def"}
+            stroke={selected ? strokeAccent : strokeIdle}
             strokeWidth={stroke.strokeWidth}
             strokeDasharray={stroke.strokeDasharray}
             strokeLinecap="round"
@@ -394,7 +424,7 @@ function DrawingShape({ drawing, api, selected, disabled, onBeginEdit }: ShapePr
             y={y - 8}
             width={66}
             height={16}
-            fill={selected ? "#2962ff" : "#5b8def"}
+            fill={selected ? strokeAccent : strokeIdle}
             rx={2}
             pointerEvents="none"
           />
@@ -427,7 +457,7 @@ function DrawingShape({ drawing, api, selected, disabled, onBeginEdit }: ShapePr
             width={r.w}
             height={r.h}
             fill="rgba(91, 141, 239, 0.12)"
-            stroke={selected ? "#2962ff" : "#5b8def"}
+            stroke={selected ? strokeAccent : strokeIdle}
             strokeWidth={selected ? 2 : 1.5}
             pointerEvents={hitEvents}
             style={{ cursor: bodyCursor }}
@@ -511,6 +541,7 @@ function DrawingShape({ drawing, api, selected, disabled, onBeginEdit }: ShapePr
           api={api}
           selected={selected}
           disabled={disabled}
+          palette={palette}
           onBeginEdit={onBeginEdit}
         />
       );
@@ -522,12 +553,14 @@ function PositionShape({
   api,
   selected,
   disabled,
+  palette,
   onBeginEdit,
 }: {
   drawing: Extract<Drawing, { kind: "long" | "short" }>;
   api: ChartCoordinateApi;
   selected: boolean;
   disabled: boolean;
+  palette: OverlayPalette;
   onBeginEdit: (e: React.PointerEvent<SVGElement>, role: EditRole) => void;
 }) {
   const ax = api.timeToX(drawing.a.time);
@@ -612,7 +645,7 @@ function PositionShape({
         y1={targetY}
         x2={x + w}
         y2={targetY}
-        stroke="#26a69a"
+        stroke={palette.up}
         strokeWidth={selected ? 2 : 1.5}
         pointerEvents="none"
       />
@@ -633,7 +666,7 @@ function PositionShape({
         y1={entryY}
         x2={x + w}
         y2={entryY}
-        stroke="#5b8def"
+        stroke={palette.line}
         strokeWidth={selected ? 2 : 1.5}
         strokeDasharray="3 3"
         pointerEvents="none"
@@ -655,21 +688,21 @@ function PositionShape({
         y1={stopY}
         x2={x + w}
         y2={stopY}
-        stroke="#ef5350"
+        stroke={palette.down}
         strokeWidth={selected ? 2 : 1.5}
         pointerEvents="none"
       />
 
       <g pointerEvents="none">
-        <rect x={x + 4} y={targetY - 8} width={56} height={16} fill="#26a69a" rx={2} />
+        <rect x={x + 4} y={targetY - 8} width={56} height={16} fill={palette.up} rx={2} />
         <text x={x + 32} y={targetY + 4} fill="white" fontSize={10} fontFamily="monospace" textAnchor="middle">
           T {drawing.target.toFixed(2)}
         </text>
-        <rect x={x + 4} y={entryY - 8} width={56} height={16} fill="#5b8def" rx={2} />
+        <rect x={x + 4} y={entryY - 8} width={56} height={16} fill={palette.line} rx={2} />
         <text x={x + 32} y={entryY + 4} fill="white" fontSize={10} fontFamily="monospace" textAnchor="middle">
           E {drawing.entry.toFixed(2)}
         </text>
-        <rect x={x + 4} y={stopY - 8} width={56} height={16} fill="#ef5350" rx={2} />
+        <rect x={x + 4} y={stopY - 8} width={56} height={16} fill={palette.down} rx={2} />
         <text x={x + 32} y={stopY + 4} fill="white" fontSize={10} fontFamily="monospace" textAnchor="middle">
           S {drawing.stop.toFixed(2)}
         </text>
@@ -678,14 +711,14 @@ function PositionShape({
           y={Math.min(targetY, stopY) - 18}
           width={68}
           height={16}
-          fill="#1e222d"
-          stroke="#2a2e39"
+          fill={palette.badgeBg}
+          stroke={palette.badgeBorder}
           rx={2}
         />
         <text
           x={x + w - 38}
           y={Math.min(targetY, stopY) - 6}
-          fill="white"
+          fill={palette.badgeText}
           fontSize={10}
           fontFamily="monospace"
           textAnchor="middle"
@@ -706,7 +739,15 @@ function PositionShape({
   );
 }
 
-function DraftShape({ draft, api }: { draft: Draft; api: ChartCoordinateApi }) {
+function DraftShape({
+  draft,
+  api,
+  palette,
+}: {
+  draft: Draft;
+  api: ChartCoordinateApi;
+  palette: OverlayPalette;
+}) {
   const ax = api.timeToX(draft.a.time);
   const bx = api.timeToX(draft.b.time);
   const ay = api.priceToY(draft.a.price);
@@ -721,7 +762,7 @@ function DraftShape({ draft, api }: { draft: Draft; api: ChartCoordinateApi }) {
           y1={ay}
           x2={bx}
           y2={by}
-          stroke="#2962ff"
+          stroke={palette.accent}
           strokeWidth={1.5}
           strokeDasharray="4 4"
         />
@@ -734,7 +775,7 @@ function DraftShape({ draft, api }: { draft: Draft; api: ChartCoordinateApi }) {
           width={Math.abs(bx - ax)}
           height={Math.abs(by - ay)}
           fill="rgba(41, 98, 255, 0.12)"
-          stroke="#2962ff"
+          stroke={palette.accent}
           strokeWidth={1.5}
           strokeDasharray="4 4"
         />
@@ -749,7 +790,7 @@ function DraftShape({ draft, api }: { draft: Draft; api: ChartCoordinateApi }) {
           width={Math.abs(bx - ax)}
           height={Math.abs(by - ay)}
           fill="rgba(41, 98, 255, 0.08)"
-          stroke="#2962ff"
+          stroke={palette.accent}
           strokeWidth={1}
           strokeDasharray="3 3"
         />

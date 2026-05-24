@@ -27,7 +27,7 @@ export default function LeftToolbar({
   const [stylePopover, setStylePopover] = useState<StylePopoverTarget>(null);
 
   return (
-    <div className="flex flex-col w-10 bg-[#131722] border-r border-[#2a2e39] py-2 gap-0.5 items-center">
+    <div className="flex flex-col w-10 bg-bg border-r border-border py-2 gap-0.5 items-center">
       {DRAWING_TOOLS.map((tool) => {
         const active = activeTool === tool.id;
         const hasStyle = tool.id === "trend" || tool.id === "horizontal";
@@ -38,8 +38,8 @@ export default function LeftToolbar({
               title={tool.label}
               className={`w-9 h-9 flex items-center justify-center rounded transition-colors ${
                 active
-                  ? "bg-[#2962ff] text-white"
-                  : "text-[#9ba0aa] hover:text-white hover:bg-[#1e222d]"
+                  ? "bg-accent text-white"
+                  : "text-text-muted hover:text-text-strong hover:bg-bg-elev"
               }`}
             >
               <ToolIcon tool={tool.id} />
@@ -56,7 +56,7 @@ export default function LeftToolbar({
                       rect,
                     });
                 }}
-                className="absolute bottom-0 right-0 w-3 h-3 flex items-center justify-center text-[#9ba0aa] hover:text-white"
+                className="absolute bottom-0 right-0 w-3 h-3 flex items-center justify-center text-text-muted hover:text-text-strong"
                 title="Line style"
               >
                 <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor">
@@ -68,12 +68,12 @@ export default function LeftToolbar({
         );
       })}
 
-      <div className="w-6 h-px bg-[#2a2e39] my-1" />
+      <div className="w-6 h-px bg-border my-1" />
 
       <button
         onClick={onClearAll}
         title="Clear drawings"
-        className="w-9 h-9 flex items-center justify-center text-[#9ba0aa] hover:text-white hover:bg-[#1e222d] rounded"
+        className="w-9 h-9 flex items-center justify-center text-text-muted hover:text-text-strong hover:bg-bg-elev rounded"
       >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="3 6 5 6 21 6" />

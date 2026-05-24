@@ -1,26 +1,74 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+:root,
+[data-theme="dark"] {
+  --bg: #131722;
+  --bg-elev: #1e222d;
+  --bg-hover: #2a2e39;
+  --border: #2a2e39;
+  --text: #d1d4dc;
+  --text-strong: #ffffff;
+  --text-muted: #9ba0aa;
+  --accent: #2962ff;
+  --accent-soft: #1a2747;
+  --line: #5b8def;
+  --up: #26a69a;
+  --up-soft: rgba(38, 166, 154, 0.45);
+  --up-bg: #0f2c2a;
+  --down: #ef5350;
+  --down-soft: rgba(239, 83, 80, 0.4);
+  --down-bg: #2d1b1d;
+  --grid: #1e222d;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+[data-theme="light"] {
+  --bg: #ffffff;
+  --bg-elev: #f4f6fa;
+  --bg-hover: #e6e9ef;
+  --border: #d8dde5;
+  --text: #2a2e39;
+  --text-strong: #131722;
+  --text-muted: #6b7280;
+  --accent: #2962ff;
+  --accent-soft: #e3edff;
+  --line: #2962ff;
+  --up: #089981;
+  --up-soft: rgba(8, 153, 129, 0.35);
+  --up-bg: #e3f4ee;
+  --down: #e02e3a;
+  --down-soft: rgba(224, 46, 58, 0.3);
+  --down-bg: #fbe4e6;
+  --grid: #e6e9ef;
+}
+
+@theme {
+  --color-bg: var(--bg);
+  --color-bg-elev: var(--bg-elev);
+  --color-bg-hover: var(--bg-hover);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-text-strong: var(--text-strong);
+  --color-text-muted: var(--text-muted);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-line: var(--line);
+  --color-up: var(--up);
+  --color-up-soft: var(--up-soft);
+  --color-up-bg: var(--up-bg);
+  --color-down: var(--down);
+  --color-down-soft: var(--down-soft);
+  --color-down-bg: var(--down-bg);
+  --color-grid: var(--grid);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html,
+body {
+  background: var(--bg);
+  color: var(--text);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }

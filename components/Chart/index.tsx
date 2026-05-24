@@ -9,25 +9,45 @@ import SymbolSearch from "./SymbolSearch";
 import ReplayBar from "./ReplayBar";
 import LeftToolbar from "./LeftToolbar";
 import DrawingOverlay from "./DrawingOverlay";
-import { generateMockCandles } from "./utils";
-import { Drawing, DrawingTool, LineStyle, Timeframe, WatchlistItem } from "./types";
-import { WATCHLIST_SECTIONS } from "./constants";
+import { TIMEFRAME_TO_API } from "./constants";
+import {
+  Candle,
+  Drawing,
+  DrawingTool,
+  LineStyle,
+  SymbolInfo,
+  Timeframe,
+  WatchlistItem,
+  WatchlistSection,
+} from "./types";
+import { fetchCandles, fetchSymbolInfo, fetchWatchlist } from "@/lib/api";
 
-const ALL_ITEMS = WATCHLIST_SECTIONS.flatMap((s) => s.items);
-const DEFAULT_ITEM = ALL_ITEMS.find((i) => i.symbol === "XAUUSI") ?? ALL_ITEMS[0];
+const FALLBACK_ITEM: WatchlistItem = {
+  symbol: "BTC/USD",
+  iconColor: "#f7931a",
+  iconLabel: "B",
+  last: "—",
+  change: "0",
+  changePercent: "0%",
+  isPositive: true,
+};
 
 type ReplayState = "idle" | "selecting" | "playing";
 
 export default function Chart() {
   const [timeframe, setTimeframe] = useState<Timeframe>("D");
-  const [activeItem, setActiveItem] = useState<WatchlistItem>(DEFAULT_ITEM);
+  const [sections, setSections] = useState<WatchlistSection[]>([]);
+  const [watchlistLoading, setWatchlistLoading] = useState(true);
+  const [activeItem, setActiveItem] = useState<WatchlistItem>(FALLBACK_ITEM);
+  const [symbolInfo, setSymbolInfo] = useState<SymbolInfo | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
 
-  const candles = useMemo(() => generateMockCandles(260, 3500), []);
+  const [candles, setCandles] = useState<Candle[]>([]);
+  const [candleError, setCandleError] = useState<string | null>(null);
 
   const [replayState, setReplayState] = useState<ReplayState>("idle");
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-  const [visibleCount, setVisibleCount] = useState(candles.length);
+  const [visibleCount, setVisibleCount] = useState(0);
   const [speed, setSpeed] = useState(1);
 
   const [activeTool, setActiveTool] = useState<DrawingTool | null>(null);
@@ -40,13 +60,79 @@ export default function Chart() {
     width: 2,
   });
 
+  const apiRef = useRef<ChartCoordinateApi | null>(null);
+
+  const bumpRedraw = useCallback(() => {
+    setRedrawTick((t) => t + 1);
+  }, []);
+
+  // Watchlist on mount
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const data = await fetchWatchlist();
+        if (cancelled) return;
+        setSections(data);
+        const first = data.flatMap((s) => s.items)[0];
+        if (first) setActiveItem(first);
+      } catch (err) {
+        console.error("Failed to load watchlist", err);
+      } finally {
+        if (!cancelled) setWatchlistLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Candles whenever active symbol or timeframe changes
+  useEffect(() => {
+    let cancelled = false;
+    setCandleError(null);
+    (async () => {
+      try {
+        const data = await fetchCandles(activeItem.symbol, TIMEFRAME_TO_API[timeframe], 5000);
+        if (cancelled) return;
+        setCandles(data);
+        setVisibleCount(data.length);
+      } catch (err) {
+        if (!cancelled)
+          setCandleError(err instanceof Error ? err.message : "Failed to load candles");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeItem.symbol, timeframe]);
+
+  // Symbol info whenever active symbol changes
+  useEffect(() => {
+    let cancelled = false;
+    setSymbolInfo(null);
+    (async () => {
+      try {
+        const data = await fetchSymbolInfo(activeItem.symbol);
+        if (!cancelled) setSymbolInfo(data);
+      } catch (err) {
+        console.error("Failed to load symbol info", err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeItem.symbol]);
+
   const handleStyleChange = useCallback(
     (tool: "trend" | "horizontal", style: LineStyle) => {
       if (tool === "trend") setTrendStyle(style);
       else setHorizontalStyle(style);
       setDrawings((ds) =>
         ds.map((d) =>
-          d.id === selectedDrawingId && (d.kind === "trend" || d.kind === "horizontal") && d.kind === tool
+          d.id === selectedDrawingId &&
+          (d.kind === "trend" || d.kind === "horizontal") &&
+          d.kind === tool
             ? ({ ...d, style } as Drawing)
             : d
         )
@@ -54,12 +140,6 @@ export default function Chart() {
     },
     [selectedDrawingId]
   );
-
-  const apiRef = useRef<ChartCoordinateApi | null>(null);
-
-  const bumpRedraw = useCallback(() => {
-    setRedrawTick((t) => t + 1);
-  }, []);
 
   useEffect(() => {
     if (replayState !== "playing") return;
@@ -90,6 +170,7 @@ export default function Chart() {
   }, [selectedDrawingId]);
 
   const handleReplayClick = () => {
+    if (candles.length === 0) return;
     if (replayState === "idle") {
       setReplayState("selecting");
       setSelectedIndex(Math.floor(candles.length * 0.6));
@@ -119,11 +200,15 @@ export default function Chart() {
   };
 
   const replayActive = replayState !== "idle";
+  const effectiveVisibleCount =
+    replayState === "playing" ? visibleCount : candles.length;
+
+  const headerSymbol = useMemo(() => activeItem.symbol, [activeItem]);
 
   return (
-    <div className="flex flex-col w-full h-screen bg-[#131722] text-[#d1d4dc] overflow-hidden">
+    <div className="flex flex-col w-full h-screen bg-bg text-text overflow-hidden">
       <Header
-        symbol={activeItem.symbol}
+        symbol={headerSymbol}
         timeframe={timeframe}
         onTimeframeChange={setTimeframe}
         replayActive={replayActive}
@@ -145,7 +230,7 @@ export default function Chart() {
         <div className="relative flex-1 flex">
           <ChartArea
             candles={candles}
-            visibleCount={replayState === "playing" ? visibleCount : candles.length}
+            visibleCount={effectiveVisibleCount}
             replayActive={replayState === "selecting"}
             selectedIndex={selectedIndex}
             onSelectedIndexChange={setSelectedIndex}
@@ -169,6 +254,11 @@ export default function Chart() {
               redrawTick={redrawTick}
             />
           </ChartArea>
+          {candleError && (
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 bg-down-bg border border-down text-down text-xs px-3 py-1.5 rounded">
+              {candleError}
+            </div>
+          )}
           {replayActive && (
             <ReplayBar
               isPlaying={replayState === "playing"}
@@ -179,11 +269,16 @@ export default function Chart() {
             />
           )}
         </div>
-        <div className="flex flex-col w-[280px] border-l border-[#2a2e39]">
+        <div className="flex flex-col w-70 border-l border-border">
           <div className="flex-1 min-h-0">
-            <Watchlist activeSymbol={activeItem.symbol} onSelect={setActiveItem} />
+            <Watchlist
+              sections={sections}
+              activeSymbol={activeItem.symbol}
+              onSelect={setActiveItem}
+              loading={watchlistLoading}
+            />
           </div>
-          <SymbolCard item={activeItem} />
+          <SymbolCard item={activeItem} info={symbolInfo} />
         </div>
       </div>
 

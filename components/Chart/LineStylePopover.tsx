@@ -47,11 +47,11 @@ export default function LineStylePopover({
   return (
     <div
       ref={ref}
-      className="fixed z-[100] bg-[#1e222d] border border-[#2a2e39] rounded-md shadow-2xl p-2"
+      className="fixed z-[100] bg-bg-elev border border-border rounded-md shadow-2xl p-2"
       style={{ top, left }}
       onMouseDown={(e) => e.stopPropagation()}
     >
-      <div className="text-[10px] text-[#9ba0aa] mb-1.5 px-1 uppercase tracking-wide">Pattern</div>
+      <div className="text-[10px] text-text-muted mb-1.5 px-1 uppercase tracking-wide">Pattern</div>
       <div className="flex gap-1 mb-2">
         {PATTERNS.map((p) => (
           <button
@@ -59,8 +59,8 @@ export default function LineStylePopover({
             onClick={() => onChange({ ...style, pattern: p.id })}
             className={`w-12 h-7 flex items-center justify-center rounded border transition-colors ${
               style.pattern === p.id
-                ? "border-[#2962ff] bg-[#1a2747]"
-                : "border-[#2a2e39] hover:border-[#3a4150]"
+                ? "border-accent bg-accent-soft"
+                : "border-border hover:border-bg-hover"
             }`}
             title={p.id}
           >
@@ -70,7 +70,8 @@ export default function LineStylePopover({
                 y1="3"
                 x2="30"
                 y2="3"
-                stroke="white"
+                stroke="currentColor"
+                className="text-text-strong"
                 strokeWidth={2}
                 strokeDasharray={p.dash || undefined}
                 strokeLinecap="round"
@@ -80,7 +81,7 @@ export default function LineStylePopover({
         ))}
       </div>
 
-      <div className="text-[10px] text-[#9ba0aa] mb-1.5 px-1 uppercase tracking-wide">Thickness</div>
+      <div className="text-[10px] text-text-muted mb-1.5 px-1 uppercase tracking-wide">Thickness</div>
       <div className="flex gap-1">
         {WIDTHS.map((w) => (
           <button
@@ -88,13 +89,13 @@ export default function LineStylePopover({
             onClick={() => onChange({ ...style, width: w })}
             className={`w-12 h-7 flex items-center justify-center rounded border transition-colors ${
               style.width === w
-                ? "border-[#2962ff] bg-[#1a2747]"
-                : "border-[#2a2e39] hover:border-[#3a4150]"
+                ? "border-accent bg-accent-soft"
+                : "border-border hover:border-bg-hover"
             }`}
             title={`${w}px`}
           >
-            <svg width="32" height="6" viewBox="0 0 32 6">
-              <line x1="2" y1="3" x2="30" y2="3" stroke="white" strokeWidth={w} strokeLinecap="round" />
+            <svg width="32" height="6" viewBox="0 0 32 6" className="text-text-strong">
+              <line x1="2" y1="3" x2="30" y2="3" stroke="currentColor" strokeWidth={w} strokeLinecap="round" />
             </svg>
           </button>
         ))}
