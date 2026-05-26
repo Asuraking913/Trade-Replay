@@ -302,7 +302,7 @@ export default function Chart() {
           )}
           {candles.length > 0 && (
             <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 text-down text-[11px] md:text-sm font-medium md:font-semibold pointer-events-none text-center px-3 max-w-[92vw] whitespace-nowrap">
-              Not real-time data · last bar {candles[candles.length - 1].time}
+              Delayed data — last update {candles[candles.length - 1].time}
             </div>
           )}
           {replayActive && (
