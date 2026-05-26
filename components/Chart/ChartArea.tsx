@@ -55,6 +55,7 @@ interface ChartAreaProps {
   candles: Candle[];
   visibleCount: number;
   replayActive: boolean;
+  lockPriceScale?: boolean;
   selectedIndex: number | null;
   onSelectedIndexChange: (idx: number) => void;
   apiRef?: RefObject<ChartCoordinateApi | null>;
@@ -67,6 +68,7 @@ export default function ChartArea({
   candles,
   visibleCount,
   replayActive,
+  lockPriceScale = false,
   selectedIndex,
   onSelectedIndexChange,
   apiRef,
@@ -85,6 +87,7 @@ export default function ChartArea({
 
   const { theme } = useTheme();
   const palette = PALETTES[theme];
+  const lastFirstTimeRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -195,7 +198,16 @@ export default function ChartArea({
     if (!candleSeriesRef.current || !smaSeriesRef.current || !volumeSeriesRef.current) return;
     const chart = chartRef.current;
 
-    const savedRange = chart?.timeScale().getVisibleLogicalRange() ?? null;
+    const firstTime = candles[0]?.time ?? null;
+    const isNewDataset = firstTime !== lastFirstTimeRef.current;
+    const savedRange =
+      !isNewDataset && chart
+        ? chart.timeScale().getVisibleLogicalRange()
+        : null;
+
+    if (chart && lockPriceScale && !isNewDataset) {
+      chart.priceScale("right").applyOptions({ autoScale: false });
+    }
 
     const slice = candles.slice(0, Math.max(1, visibleCount));
 
@@ -224,12 +236,22 @@ export default function ChartArea({
       }))
     );
 
-    if (chart && savedRange) {
-      chart.timeScale().setVisibleLogicalRange(savedRange);
+    if (chart) {
+      if (isNewDataset) {
+        const ts = chart.timeScale();
+        ts.resetTimeScale();
+        ts.fitContent();
+        if (!lockPriceScale) {
+          chart.priceScale("right").applyOptions({ autoScale: true });
+        }
+      } else if (savedRange) {
+        chart.timeScale().setVisibleLogicalRange(savedRange);
+      }
     }
+    lastFirstTimeRef.current = firstTime;
 
     onRangeChange?.();
-  }, [candles, visibleCount, onRangeChange, palette]);
+  }, [candles, visibleCount, onRangeChange, palette, lockPriceScale]);
 
   useEffect(() => {
     const chart = chartRef.current;
@@ -255,6 +277,21 @@ export default function ChartArea({
   }, [palette]);
 
   useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    chart.priceScale("right").applyOptions({ autoScale: !lockPriceScale });
+  }, [lockPriceScale]);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    chart.applyOptions({
+      handleScroll: !replayActive,
+      handleScale: !replayActive,
+    });
+  }, [replayActive]);
+
+  useEffect(() => {
     if (!replayActive) {
       setLineX(null);
       return;
@@ -262,11 +299,7 @@ export default function ChartArea({
     if (selectedIndex == null) return;
     const chart = chartRef.current;
     if (!chart) return;
-    const candle = candles[selectedIndex];
-    if (!candle) return;
-    const x = chart
-      .timeScale()
-      .timeToCoordinate((new Date(candle.time).getTime() / 1000) as UTCTimestamp);
+    const x = chart.timeScale().logicalToCoordinate(selectedIndex as never);
     if (x != null) setLineX(x);
   }, [replayActive, selectedIndex, candles, visibleCount]);
 

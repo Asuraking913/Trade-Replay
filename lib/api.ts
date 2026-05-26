@@ -7,7 +7,7 @@ import {
 
 const BASE_URL = "http://127.0.0.1:8000/api";
 
-export type ApiTimeframe = "1h" | "4h" | "1day";
+export type ApiTimeframe = "1min" | "5min" | "15min" | "1h" | "4h" | "1day";
 
 interface RawCandle {
   time: string;
@@ -16,6 +16,23 @@ interface RawCandle {
   low: string;
   close: string;
   volume: number;
+}
+
+const SYMBOL_ICONS: Record<string, { color: string; label: string }> = {
+  "BTC/USD": { color: "#f7931a", label: "B" },
+  "ETH/USD": { color: "#627eea", label: "E" },
+  "SOL/USD": { color: "#9945ff", label: "S" },
+  "BNB/USD": { color: "#f3ba2f", label: "B" },
+  "XAU/USD": { color: "#ffcc33", label: "X" },
+  "EUR/USD": { color: "#003399", label: "E" },
+  "GBP/USD": { color: "#c8102e", label: "G" },
+  "USD/JPY": { color: "#bc002d", label: "J" },
+};
+
+function applyIcon(item: WatchlistItem): WatchlistItem {
+  const override = SYMBOL_ICONS[item.symbol];
+  if (!override) return item;
+  return { ...item, iconColor: override.color, iconLabel: override.label };
 }
 
 async function getJson<T>(url: string): Promise<T> {
@@ -46,11 +63,13 @@ export async function fetchSymbolInfo(symbol: string): Promise<SymbolInfo> {
 }
 
 export async function fetchWatchlist(): Promise<WatchlistSection[]> {
-  return getJson<WatchlistSection[]>(`${BASE_URL}/watchlist/`);
+  const raw = await getJson<WatchlistSection[]>(`${BASE_URL}/watchlist/`);
+  return raw.map((s) => ({ ...s, items: s.items.map(applyIcon) }));
 }
 
 export async function searchSymbols(q: string): Promise<WatchlistItem[]> {
-  return getJson<WatchlistItem[]>(
+  const raw = await getJson<WatchlistItem[]>(
     `${BASE_URL}/search/?q=${encodeURIComponent(q)}`
   );
+  return raw.map(applyIcon);
 }

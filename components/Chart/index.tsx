@@ -32,7 +32,7 @@ const FALLBACK_ITEM: WatchlistItem = {
   isPositive: true,
 };
 
-type ReplayState = "idle" | "selecting" | "playing";
+type ReplayState = "idle" | "selecting" | "playing" | "paused";
 
 export default function Chart() {
   const [timeframe, setTimeframe] = useState<Timeframe>("D");
@@ -60,6 +60,9 @@ export default function Chart() {
     width: 2,
   });
 
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const [watchlistOpen, setWatchlistOpen] = useState(false);
+
   const apiRef = useRef<ChartCoordinateApi | null>(null);
 
   const bumpRedraw = useCallback(() => {
@@ -74,7 +77,9 @@ export default function Chart() {
         const data = await fetchWatchlist();
         if (cancelled) return;
         setSections(data);
-        const first = data.flatMap((s) => s.items)[0];
+        const cryptoSection = data.find((s) => s.name.toUpperCase() === "CRYPTO");
+        const first =
+          cryptoSection?.items[0] ?? data.flatMap((s) => s.items)[0];
         if (first) setActiveItem(first);
       } catch (err) {
         console.error("Failed to load watchlist", err);
@@ -97,6 +102,8 @@ export default function Chart() {
         if (cancelled) return;
         setCandles(data);
         setVisibleCount(data.length);
+        setReplayState("idle");
+        setSelectedIndex(null);
       } catch (err) {
         if (!cancelled)
           setCandleError(err instanceof Error ? err.message : "Failed to load candles");
@@ -173,7 +180,22 @@ export default function Chart() {
     if (candles.length === 0) return;
     if (replayState === "idle") {
       setReplayState("selecting");
-      setSelectedIndex(Math.floor(candles.length * 0.6));
+      const visible = apiRef.current
+        ? (() => {
+            const w = apiRef.current!.width;
+            const left = apiRef.current!.xToTime(0);
+            const right = apiRef.current!.xToTime(w);
+            if (left == null || right == null) return null;
+            return { left, right };
+          })()
+        : null;
+      const defaultIdx =
+        visible
+          ? Math.round(visible.left + (visible.right - visible.left) * 0.6)
+          : Math.max(0, candles.length - 50);
+      setSelectedIndex(
+        Math.max(0, Math.min(candles.length - 1, defaultIdx))
+      );
       setVisibleCount(candles.length);
     } else {
       setReplayState("idle");
@@ -184,7 +206,11 @@ export default function Chart() {
 
   const handlePlayPause = () => {
     if (replayState === "playing") {
-      setReplayState("selecting");
+      setReplayState("paused");
+      return;
+    }
+    if (replayState === "paused") {
+      setReplayState("playing");
       return;
     }
     if (selectedIndex != null) {
@@ -201,7 +227,9 @@ export default function Chart() {
 
   const replayActive = replayState !== "idle";
   const effectiveVisibleCount =
-    replayState === "playing" ? visibleCount : candles.length;
+    replayState === "playing" || replayState === "paused"
+      ? visibleCount
+      : candles.length;
 
   const headerSymbol = useMemo(() => activeItem.symbol, [activeItem]);
 
@@ -214,24 +242,37 @@ export default function Chart() {
         replayActive={replayActive}
         onReplayClick={handleReplayClick}
         onSearchClick={() => setSearchOpen(true)}
+        onOpenTools={() => setToolsOpen(true)}
+        onOpenWatchlist={() => setWatchlistOpen(true)}
       />
-      <div className="flex flex-1 min-h-0">
-        <LeftToolbar
-          activeTool={activeTool}
-          onSelectTool={setActiveTool}
-          onClearAll={() => {
-            setDrawings([]);
-            setSelectedDrawingId(null);
-          }}
-          trendStyle={trendStyle}
-          horizontalStyle={horizontalStyle}
-          onStyleChange={handleStyleChange}
-        />
+      <div className="relative flex flex-1 min-h-0">
+        <div
+          className={`md:static md:translate-x-0 md:z-auto absolute top-0 left-0 h-full z-40 transition-transform duration-200 ${
+            toolsOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
+        >
+          <LeftToolbar
+            activeTool={activeTool}
+            onSelectTool={(tool) => {
+              setActiveTool(tool);
+              setToolsOpen(false);
+            }}
+            onClearAll={() => {
+              setDrawings([]);
+              setSelectedDrawingId(null);
+              setToolsOpen(false);
+            }}
+            trendStyle={trendStyle}
+            horizontalStyle={horizontalStyle}
+            onStyleChange={handleStyleChange}
+          />
+        </div>
         <div className="relative flex-1 flex">
           <ChartArea
             candles={candles}
             visibleCount={effectiveVisibleCount}
             replayActive={replayState === "selecting"}
+            lockPriceScale={replayState === "playing" || replayState === "paused"}
             selectedIndex={selectedIndex}
             onSelectedIndexChange={setSelectedIndex}
             apiRef={apiRef}
@@ -259,6 +300,11 @@ export default function Chart() {
               {candleError}
             </div>
           )}
+          {candles.length > 0 && (
+            <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 text-down text-[11px] md:text-sm font-medium md:font-semibold pointer-events-none text-center px-3 max-w-[92vw] whitespace-nowrap">
+              Not real-time data · last bar {candles[candles.length - 1].time}
+            </div>
+          )}
           {replayActive && (
             <ReplayBar
               isPlaying={replayState === "playing"}
@@ -269,17 +315,34 @@ export default function Chart() {
             />
           )}
         </div>
-        <div className="flex flex-col w-70 border-l border-border">
+        <div
+          className={`lg:static lg:translate-x-0 lg:z-auto absolute top-0 right-0 h-full w-70 max-w-[85vw] z-40 flex flex-col border-l border-border bg-bg transition-transform duration-200 ${
+            watchlistOpen ? "translate-x-0" : "translate-x-full"
+          }`}
+        >
           <div className="flex-1 min-h-0">
             <Watchlist
               sections={sections}
               activeSymbol={activeItem.symbol}
-              onSelect={setActiveItem}
+              onSelect={(item) => {
+                setActiveItem(item);
+                setWatchlistOpen(false);
+              }}
               loading={watchlistLoading}
             />
           </div>
           <SymbolCard item={activeItem} info={symbolInfo} />
         </div>
+
+        {(toolsOpen || watchlistOpen) && (
+          <div
+            className="lg:hidden absolute inset-0 bg-black/40 z-30"
+            onClick={() => {
+              setToolsOpen(false);
+              setWatchlistOpen(false);
+            }}
+          />
+        )}
       </div>
 
       <SymbolSearch

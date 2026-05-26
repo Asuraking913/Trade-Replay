@@ -11,6 +11,8 @@ interface HeaderProps {
   replayActive: boolean;
   onReplayClick: () => void;
   onSearchClick: () => void;
+  onOpenTools: () => void;
+  onOpenWatchlist: () => void;
 }
 
 export default function Header({
@@ -20,9 +22,23 @@ export default function Header({
   replayActive,
   onReplayClick,
   onSearchClick,
+  onOpenTools,
+  onOpenWatchlist,
 }: HeaderProps) {
   return (
-    <div className="flex items-center h-11 bg-bg border-b border-border text-text text-xs px-3 gap-3">
+    <div className="flex items-center h-11 bg-bg border-b border-border text-text text-xs px-2 sm:px-3 gap-2 sm:gap-3">
+      <button
+        onClick={onOpenTools}
+        className="md:hidden flex items-center justify-center w-7 h-7 text-text-muted hover:text-text-strong hover:bg-bg-hover rounded"
+        aria-label="Open tools"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="3" y1="6" x2="21" y2="6" />
+          <line x1="3" y1="12" x2="21" y2="12" />
+          <line x1="3" y1="18" x2="21" y2="18" />
+        </svg>
+      </button>
+
       <button
         onClick={onSearchClick}
         className="flex items-center gap-1.5 text-text-muted hover:text-text-strong hover:bg-bg-hover rounded px-1.5 py-1"
@@ -36,19 +52,19 @@ export default function Header({
 
       <button
         onClick={onSearchClick}
-        className="text-text-strong font-semibold text-sm hover:text-line"
+        className="text-text-strong font-semibold text-sm hover:text-line whitespace-nowrap"
       >
         {symbol}
       </button>
 
       <div className="h-5 w-px bg-border" />
 
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-1 overflow-x-auto">
         {TIMEFRAMES.map((tf) => (
           <button
             key={tf.value}
             onClick={() => onTimeframeChange(tf.value)}
-            className={`px-2.5 py-1 text-xs font-medium rounded transition-colors ${
+            className={`px-2 sm:px-2.5 py-1 text-xs font-medium rounded transition-colors ${
               timeframe === tf.value
                 ? "text-text-strong bg-bg-hover"
                 : "text-text-muted hover:text-text-strong hover:bg-bg-elev"
@@ -65,14 +81,29 @@ export default function Header({
 
       <button
         onClick={onReplayClick}
-        className={`flex items-center gap-1.5 px-3 py-1 rounded text-xs font-medium transition-colors ${
+        className={`flex items-center gap-1.5 px-2 sm:px-3 py-1 rounded text-xs font-medium transition-colors ${
           replayActive
             ? "bg-accent text-white"
             : "text-text-muted hover:text-text-strong hover:bg-bg-elev"
         }`}
       >
         <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-        {replayActive ? "Exit Replay" : "Replay"}
+        <span className="hidden sm:inline">{replayActive ? "Exit Replay" : "Replay"}</span>
+      </button>
+
+      <button
+        onClick={onOpenWatchlist}
+        className="lg:hidden flex items-center justify-center w-7 h-7 text-text-muted hover:text-text-strong hover:bg-bg-hover rounded"
+        aria-label="Open watchlist"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <line x1="8" y1="6" x2="21" y2="6" />
+          <line x1="8" y1="12" x2="21" y2="12" />
+          <line x1="8" y1="18" x2="21" y2="18" />
+          <circle cx="4" cy="6" r="1" fill="currentColor" />
+          <circle cx="4" cy="12" r="1" fill="currentColor" />
+          <circle cx="4" cy="18" r="1" fill="currentColor" />
+        </svg>
       </button>
     </div>
   );

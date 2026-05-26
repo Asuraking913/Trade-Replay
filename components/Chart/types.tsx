@@ -1,4 +1,4 @@
-export type Timeframe = "3m" | "5m" | "15m" | "30m" | "1h" | "4h" | "D";
+export type Timeframe = "1m" | "5m" | "15m" | "1h" | "4h" | "D";
 
 export interface Candle {
   time: string;
