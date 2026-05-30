@@ -15,6 +15,51 @@ import { Candle } from "./types";
 import { computeSMA } from "./utils";
 import { useTheme } from "@/lib/theme";
 
+// Convert a fractional logical index into a Unix-second timestamp by
+// interpolating between the surrounding candles. Extrapolates linearly
+// beyond either end using the local bar spacing.
+function logicalToTime(times: number[], logical: number): number | null {
+  const n = times.length;
+  if (n === 0) return null;
+  if (n === 1) return times[0];
+  if (logical <= 0) {
+    const step = times[1] - times[0];
+    return Math.round(times[0] + step * logical);
+  }
+  if (logical >= n - 1) {
+    const step = times[n - 1] - times[n - 2];
+    return Math.round(times[n - 1] + step * (logical - (n - 1)));
+  }
+  const i = Math.floor(logical);
+  const frac = logical - i;
+  return Math.round(times[i] + (times[i + 1] - times[i]) * frac);
+}
+
+// Inverse of logicalToTime: find the fractional logical index for a timestamp.
+function timeToLogical(times: number[], time: number): number | null {
+  const n = times.length;
+  if (n === 0) return null;
+  if (n === 1) return 0;
+  if (time <= times[0]) {
+    const step = times[1] - times[0];
+    return step === 0 ? 0 : (time - times[0]) / step;
+  }
+  if (time >= times[n - 1]) {
+    const step = times[n - 1] - times[n - 2];
+    return step === 0 ? n - 1 : n - 1 + (time - times[n - 1]) / step;
+  }
+  // Binary search for the bracketing candles.
+  let lo = 0;
+  let hi = n - 1;
+  while (hi - lo > 1) {
+    const mid = (lo + hi) >> 1;
+    if (times[mid] <= time) lo = mid;
+    else hi = mid;
+  }
+  const span = times[hi] - times[lo];
+  return span === 0 ? lo : lo + (time - times[lo]) / span;
+}
+
 const PALETTES = {
   dark: {
     background: "#131722",
@@ -60,6 +105,7 @@ interface ChartAreaProps {
   onSelectedIndexChange: (idx: number) => void;
   apiRef?: RefObject<ChartCoordinateApi | null>;
   onRangeChange?: () => void;
+  onReachLeftEdge?: () => void;
   children?: ReactNode;
   cursor?: string;
 }
@@ -73,6 +119,7 @@ export default function ChartArea({
   onSelectedIndexChange,
   apiRef,
   onRangeChange,
+  onReachLeftEdge,
   children,
   cursor,
 }: ChartAreaProps) {
@@ -88,6 +135,15 @@ export default function ChartArea({
   const { theme } = useTheme();
   const palette = PALETTES[theme];
   const lastFirstTimeRef = useRef<string | null>(null);
+  const lastLastTimeRef = useRef<string | null>(null);
+  const lastCountRef = useRef<number>(0);
+  // Sorted Unix-second timestamps of the currently loaded candles.
+  // Drawings anchor to timestamps so they stay pinned across timeframe changes.
+  const timesRef = useRef<number[]>([]);
+  // Latest onReachLeftEdge held in a ref so the chart subscription always
+  // calls the current callback without re-subscribing (which would recreate the chart).
+  const onReachLeftEdgeRef = useRef(onReachLeftEdge);
+  onReachLeftEdgeRef.current = onReachLeftEdge;
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -135,17 +191,24 @@ export default function ChartArea({
 
     if (apiRef) {
       apiRef.current = {
-        timeToX: (logical: number) => {
+        // Anchors are stored as Unix-second timestamps. We convert
+        // timestamp -> fractional logical index (interpolating between candles),
+        // then ask the chart for the pixel coordinate. This keeps drawings
+        // pinned to the same date/price when the timeframe changes.
+        timeToX: (time: number) => {
           const c = chartRef.current;
           if (!c) return null;
+          const logical = timeToLogical(timesRef.current, time);
+          if (logical == null) return null;
           const x = c.timeScale().logicalToCoordinate(logical as never);
           return x == null ? null : x;
         },
         xToTime: (x: number) => {
           const c = chartRef.current;
           if (!c) return null;
-          const l = c.timeScale().coordinateToLogical(x);
-          return l == null ? null : Number(l);
+          const logical = c.timeScale().coordinateToLogical(x);
+          if (logical == null) return null;
+          return logicalToTime(timesRef.current, Number(logical));
         },
         priceToY: (price: number) => {
           const s = candleSeriesRef.current;
@@ -170,6 +233,11 @@ export default function ChartArea({
         apiRef.current.height = containerRef.current.clientHeight;
       }
       onRangeChange?.();
+      // When the user scrolls near the start of loaded data, request older bars.
+      const range = chart.timeScale().getVisibleLogicalRange();
+      if (range && range.from < 10) {
+        onReachLeftEdgeRef.current?.();
+      }
     };
 
     chart.timeScale().subscribeVisibleLogicalRangeChange(notifyRange);
@@ -199,7 +267,15 @@ export default function ChartArea({
     const chart = chartRef.current;
 
     const firstTime = candles[0]?.time ?? null;
-    const isNewDataset = firstTime !== lastFirstTimeRef.current;
+    const lastTime = candles[candles.length - 1]?.time ?? null;
+    // Prepend (scroll-back): newest bar unchanged, but earlier bars were added.
+    const isPrepend =
+      lastTime != null &&
+      lastTime === lastLastTimeRef.current &&
+      firstTime !== lastFirstTimeRef.current &&
+      candles.length > lastCountRef.current;
+    const prependedCount = isPrepend ? candles.length - lastCountRef.current : 0;
+    const isNewDataset = !isPrepend && firstTime !== lastFirstTimeRef.current;
     const savedRange =
       !isNewDataset && chart
         ? chart.timeScale().getVisibleLogicalRange()
@@ -210,6 +286,8 @@ export default function ChartArea({
     }
 
     const slice = candles.slice(0, Math.max(1, visibleCount));
+
+    timesRef.current = slice.map((c) => new Date(c.time).getTime() / 1000);
 
     candleSeriesRef.current.setData(
       slice.map((c) => ({
@@ -245,10 +323,17 @@ export default function ChartArea({
           chart.priceScale("right").applyOptions({ autoScale: true });
         }
       } else if (savedRange) {
-        chart.timeScale().setVisibleLogicalRange(savedRange);
+        // On prepend, every logical index shifts right by prependedCount;
+        // offset the saved range by the same amount to keep the view steady.
+        chart.timeScale().setVisibleLogicalRange({
+          from: savedRange.from + prependedCount,
+          to: savedRange.to + prependedCount,
+        });
       }
     }
     lastFirstTimeRef.current = firstTime;
+    lastLastTimeRef.current = lastTime;
+    lastCountRef.current = candles.length;
 
     onRangeChange?.();
   }, [candles, visibleCount, onRangeChange, palette, lockPriceScale]);

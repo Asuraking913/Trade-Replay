@@ -44,6 +44,10 @@ export default function Chart() {
 
   const [candles, setCandles] = useState<Candle[]>([]);
   const [candleError, setCandleError] = useState<string | null>(null);
+  const [candlesLoading, setCandlesLoading] = useState(false);
+  const [hasMore, setHasMore] = useState(false);
+  const [oldestTime, setOldestTime] = useState<string | null>(null);
+  const loadingOlderRef = useRef(false);
 
   const [replayState, setReplayState] = useState<ReplayState>("idle");
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
@@ -96,23 +100,61 @@ export default function Chart() {
   useEffect(() => {
     let cancelled = false;
     setCandleError(null);
+    setCandlesLoading(true);
     (async () => {
       try {
-        const data = await fetchCandles(activeItem.symbol, TIMEFRAME_TO_API[timeframe], 5000);
+        const page = await fetchCandles(activeItem.symbol, TIMEFRAME_TO_API[timeframe]);
         if (cancelled) return;
-        setCandles(data);
-        setVisibleCount(data.length);
+        setCandles(page.candles);
+        setVisibleCount(page.candles.length);
+        setHasMore(page.hasMore);
+        setOldestTime(page.oldestTime);
         setReplayState("idle");
         setSelectedIndex(null);
       } catch (err) {
         if (!cancelled)
           setCandleError(err instanceof Error ? err.message : "Failed to load candles");
+      } finally {
+        if (!cancelled) setCandlesLoading(false);
       }
     })();
     return () => {
       cancelled = true;
     };
   }, [activeItem.symbol, timeframe]);
+
+  // Load an older chunk of history (infinite scroll-back).
+  const loadOlder = useCallback(async () => {
+    if (loadingOlderRef.current || !hasMore || !oldestTime) return;
+    loadingOlderRef.current = true;
+    setCandlesLoading(true);
+    try {
+      const page = await fetchCandles(activeItem.symbol, TIMEFRAME_TO_API[timeframe], {
+        before: oldestTime,
+        limit: 1000,
+      });
+      if (page.candles.length > 0) {
+        setCandles((prev) => {
+          // Guard against duplicate prepends if the same chunk arrives twice.
+          const existingFirst = prev[0]?.time;
+          const incoming = page.candles;
+          if (incoming[incoming.length - 1]?.time === existingFirst) {
+            incoming.pop();
+          }
+          const added = incoming.length;
+          setVisibleCount((vc) => vc + added);
+          return [...incoming, ...prev];
+        });
+      }
+      setHasMore(page.hasMore);
+      setOldestTime(page.oldestTime);
+    } catch {
+      // ignore scroll-back errors; user can retry by scrolling
+    } finally {
+      loadingOlderRef.current = false;
+      setCandlesLoading(false);
+    }
+  }, [activeItem.symbol, timeframe, hasMore, oldestTime]);
 
   // Symbol info whenever active symbol changes
   useEffect(() => {
@@ -180,22 +222,34 @@ export default function Chart() {
     if (candles.length === 0) return;
     if (replayState === "idle") {
       setReplayState("selecting");
+      // Default the replay line ~80% across the currently visible range.
+      // xToTime returns a Unix-second timestamp; map it to the nearest candle index.
+      const timeToIndex = (t: number) => {
+        let best = 0;
+        let bestDiff = Infinity;
+        for (let i = 0; i < candles.length; i++) {
+          const ct = new Date(candles[i].time).getTime() / 1000;
+          const diff = Math.abs(ct - t);
+          if (diff < bestDiff) {
+            bestDiff = diff;
+            best = i;
+          }
+        }
+        return best;
+      };
       const visible = apiRef.current
         ? (() => {
             const w = apiRef.current!.width;
             const left = apiRef.current!.xToTime(0);
             const right = apiRef.current!.xToTime(w);
             if (left == null || right == null) return null;
-            return { left, right };
+            return { left: timeToIndex(left), right: timeToIndex(right) };
           })()
         : null;
-      const defaultIdx =
-        visible
-          ? Math.round(visible.left + (visible.right - visible.left) * 0.6)
-          : Math.max(0, candles.length - 50);
-      setSelectedIndex(
-        Math.max(0, Math.min(candles.length - 1, defaultIdx))
-      );
+      const defaultIdx = visible
+        ? Math.round(visible.left + (visible.right - visible.left) * 0.8)
+        : Math.max(0, candles.length - 100);
+      setSelectedIndex(Math.max(0, Math.min(candles.length - 1, defaultIdx)));
       setVisibleCount(candles.length);
     } else {
       setReplayState("idle");
@@ -217,6 +271,13 @@ export default function Chart() {
       setVisibleCount(selectedIndex + 1);
       setReplayState("playing");
     }
+  };
+
+  // Clip the chart to the selected start and freeze (paused), without playing.
+  const handleClip = () => {
+    if (replayState !== "selecting" || selectedIndex == null) return;
+    setVisibleCount(selectedIndex + 1);
+    setReplayState("paused");
   };
 
   const handleExitReplay = () => {
@@ -277,6 +338,7 @@ export default function Chart() {
             onSelectedIndexChange={setSelectedIndex}
             apiRef={apiRef}
             onRangeChange={bumpRedraw}
+            onReachLeftEdge={loadOlder}
             cursor={activeTool ? "crosshair" : undefined}
           >
             <DrawingOverlay
@@ -300,6 +362,23 @@ export default function Chart() {
               {candleError}
             </div>
           )}
+          {candlesLoading && (
+            <div className="absolute top-3 right-3 z-30 flex items-center gap-1.5 bg-bg-elev/90 border border-border rounded-md px-2 py-1 text-text-muted text-[11px]">
+              <svg
+                className="animate-spin"
+                width="13"
+                height="13"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+              >
+                <path d="M12 3 a9 9 0 1 0 9 9" />
+              </svg>
+              Loading…
+            </div>
+          )}
           {candles.length > 0 && (
             <div className="absolute top-2 left-1/2 -translate-x-1/2 z-20 text-down text-[11px] md:text-sm font-medium md:font-semibold pointer-events-none text-center px-3 max-w-[92vw] whitespace-nowrap">
               Delayed data — last update {candles[candles.length - 1].time}
@@ -308,7 +387,9 @@ export default function Chart() {
           {replayActive && (
             <ReplayBar
               isPlaying={replayState === "playing"}
+              isSelecting={replayState === "selecting"}
               onPlayPause={handlePlayPause}
+              onClip={handleClip}
               onStop={handleExitReplay}
               speed={speed}
               onSpeedChange={setSpeed}

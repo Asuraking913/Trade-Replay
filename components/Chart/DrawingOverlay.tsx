@@ -275,10 +275,12 @@ function buildPosition(
 ): Drawing {
   const hi = Math.max(a.price, b.price);
   const lo = Math.min(a.price, b.price);
-  const entry = kind === "long" ? lo : hi;
+  const entry = (hi + lo) / 2;
+  // The drawn box is the whole position: entry in the middle splits it 1:1.
+  // Long: top half = profit (target at top), bottom half = stop (at bottom).
+  // Short: inverted.
   const target = kind === "long" ? hi : lo;
-  const reward = hi - lo;
-  const stop = kind === "long" ? entry - reward / 2 : entry + reward / 2;
+  const stop = kind === "long" ? lo : hi;
   return { id, kind, a, b, entry, target, stop };
 }
 
