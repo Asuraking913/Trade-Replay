@@ -2,7 +2,10 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
+import Spinner from "@/components/shared/Spinner";
+import { useAuth } from "@/lib/auth";
 
 const bodyFont = { fontFamily: "var(--font-inter), system-ui, sans-serif" };
 const displayFont = {
@@ -10,14 +13,38 @@ const displayFont = {
 };
 
 export default function LoginPage() {
+  const router = useRouter();
+  const { login, register } = useAuth();
+
   const [mode, setMode] = useState<"login" | "signup">("login");
+  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const switchMode = (next: "login" | "signup") => {
+    setMode(next);
+    setError(null);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Placeholder: no auth wired yet — drop the user into the chart.
-    window.location.href = "/chart";
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      if (mode === "login") {
+        await login(username.trim(), password);
+      } else {
+        await register(username.trim(), email.trim(), password);
+      }
+      // Keep the spinner up while we navigate away on success.
+      router.push("/dashboard");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong.");
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -82,17 +109,35 @@ export default function LoginPage() {
         <form onSubmit={handleSubmit} className="mt-8 space-y-4">
           <div>
             <label className="block text-xs uppercase tracking-wider text-white/45 mb-2">
-              Email
+              Username
             </label>
             <input
-              type="email"
+              type="text"
               required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="you@example.com"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="alice"
+              autoComplete="username"
               className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-base text-white placeholder:text-white/35 outline-none focus:border-sky-300/50 focus:bg-white/8 transition-colors"
             />
           </div>
+
+          {mode === "signup" && (
+            <div>
+              <label className="block text-xs uppercase tracking-wider text-white/45 mb-2">
+                Email
+              </label>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@example.com"
+                autoComplete="email"
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-base text-white placeholder:text-white/35 outline-none focus:border-sky-300/50 focus:bg-white/8 transition-colors"
+              />
+            </div>
+          )}
 
           <div>
             <label className="block text-xs uppercase tracking-wider text-white/45 mb-2">
@@ -104,21 +149,39 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
+              autoComplete={mode === "login" ? "current-password" : "new-password"}
               className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-base text-white placeholder:text-white/35 outline-none focus:border-sky-300/50 focus:bg-white/8 transition-colors"
             />
           </div>
 
+          {error && (
+            <p className="text-sm text-rose-300" role="alert">
+              {error}
+            </p>
+          )}
+
           <motion.button
             type="submit"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-            className="w-full flex items-center justify-center gap-2 bg-sky-300 hover:bg-sky-200 text-[#050b1f] text-base font-medium px-6 py-3.5 rounded-lg shadow-[0_0_0_0_rgba(125,211,252,0)] hover:shadow-[0_0_24px_2px_rgba(125,211,252,0.45)] transition-shadow"
+            disabled={isSubmitting}
+            aria-busy={isSubmitting}
+            whileHover={isSubmitting ? undefined : { scale: 1.02 }}
+            whileTap={isSubmitting ? undefined : { scale: 0.98 }}
+            className="w-full flex items-center justify-center gap-2 bg-sky-300 hover:bg-sky-200 text-[#050b1f] text-base font-medium px-6 py-3.5 rounded-lg shadow-[0_0_0_0_rgba(125,211,252,0)] hover:shadow-[0_0_24px_2px_rgba(125,211,252,0.45)] transition-shadow disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            {mode === "login" ? "Log in" : "Create account"}
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="5" y1="12" x2="19" y2="12" />
-              <polyline points="12 5 19 12 12 19" />
-            </svg>
+            {isSubmitting ? (
+              <>
+                <Spinner size={16} />
+                {mode === "login" ? "Logging in…" : "Creating account…"}
+              </>
+            ) : (
+              <>
+                {mode === "login" ? "Log in" : "Create account"}
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                  <polyline points="12 5 19 12 12 19" />
+                </svg>
+              </>
+            )}
           </motion.button>
         </form>
 
@@ -127,7 +190,7 @@ export default function LoginPage() {
             <>
               No account?{" "}
               <button
-                onClick={() => setMode("signup")}
+                onClick={() => switchMode("signup")}
                 className="text-sky-300 hover:text-sky-200 transition-colors font-medium"
               >
                 Sign up
@@ -137,7 +200,7 @@ export default function LoginPage() {
             <>
               Already have an account?{" "}
               <button
-                onClick={() => setMode("login")}
+                onClick={() => switchMode("login")}
                 className="text-sky-300 hover:text-sky-200 transition-colors font-medium"
               >
                 Log in

@@ -17,7 +17,16 @@ export default function LandingNav() {
     <header className="relative z-10 flex items-center justify-between px-6 sm:px-10 py-6">
       <Link href="/" className="group flex items-center gap-3 outline-none">
         <div className="w-10 h-10 rounded-md bg-white/95 flex items-center justify-center transition-transform duration-300 group-hover:scale-110 group-hover:-rotate-6">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#050b1f" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="#050b1f"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <polyline points="3 17 9 11 13 15 21 7" />
             <polyline points="14 7 21 7 21 14" />
           </svg>

@@ -5,7 +5,7 @@ import {
   WatchlistSection,
 } from "@/components/Chart/types";
 
-const BASE_URL = "http://127.0.0.1:8000/api";
+export const BASE_URL = "http://127.0.0.1:8000/api";
 
 export type ApiTimeframe = "1min" | "5min" | "15min" | "1h" | "4h" | "1day";
 

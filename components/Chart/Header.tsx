@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Timeframe } from "./types";
 import { TIMEFRAMES } from "./constants";
 import ThemeToggle from "./ThemeToggle";
@@ -27,6 +28,23 @@ export default function Header({
 }: HeaderProps) {
   return (
     <div className="flex items-center h-11 bg-bg border-b border-border text-text text-xs px-2 sm:px-3 gap-2 sm:gap-3">
+      <Link
+        href="/dashboard"
+        className="flex items-center gap-1.5 text-text-muted hover:text-text-strong hover:bg-bg-hover rounded px-1.5 py-1"
+        aria-label="Back to dashboard"
+        title="Back to dashboard"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="3" width="7" height="9" rx="1" />
+          <rect x="14" y="3" width="7" height="5" rx="1" />
+          <rect x="14" y="12" width="7" height="9" rx="1" />
+          <rect x="3" y="16" width="7" height="5" rx="1" />
+        </svg>
+        <span className="hidden sm:inline font-medium">Dashboard</span>
+      </Link>
+
+      <div className="h-5 w-px bg-border" />
+
       <button
         onClick={onOpenTools}
         className="md:hidden flex items-center justify-center w-7 h-7 text-text-muted hover:text-text-strong hover:bg-bg-hover rounded"
