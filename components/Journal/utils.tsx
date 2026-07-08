@@ -48,3 +48,12 @@ export function parseNum(v: string): number | null {
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 }
+
+// Show prices with thousands separators and at most 2 decimals, so raw
+// values like 570.30788412 render as 570.31 instead of a long tail.
+export function fmtPrice(v: number): string {
+  return v.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}

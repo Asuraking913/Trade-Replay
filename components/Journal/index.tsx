@@ -121,7 +121,8 @@ export default function Journal() {
           </p>
         </motion.div>
 
-        <div className="mt-10 grid grid-cols-1 lg:grid-cols-[1.15fr_1fr] gap-8">
+        <div className="mt-10 grid grid-cols-1 lg:grid-cols-[1.15fr_1fr] gap-8 items-start">
+          <div className="lg:sticky lg:top-6">
           <TradeForm
             symbol={symbol}
             setSymbol={setSymbol}
@@ -147,6 +148,7 @@ export default function Journal() {
             error={saveError}
             onSubmit={handleSubmit}
           />
+          </div>
 
           <EntryList
             entries={entries}

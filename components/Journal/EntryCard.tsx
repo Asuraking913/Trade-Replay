@@ -1,7 +1,7 @@
 import { motion } from "motion/react";
 import { JournalEntry } from "./types";
 import { EMOTIONS, displayFont, easeOut } from "./constants";
-import { riskReward, fmtDate } from "./utils";
+import { riskReward, fmtDate, fmtPrice } from "./utils";
 
 interface EntryCardProps {
   item: JournalEntry;
@@ -57,17 +57,26 @@ export default function EntryCard({ item, onDelete }: EntryCardProps) {
         <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-sm text-white/60">
           {item.entry != null && (
             <span>
-              Entry <span className="text-white/90">{item.entry}</span>
+              Entry{" "}
+              <span className="text-white/90 tabular-nums">
+                {fmtPrice(item.entry)}
+              </span>
             </span>
           )}
           {item.stop != null && (
             <span>
-              Stop <span className="text-white/90">{item.stop}</span>
+              Stop{" "}
+              <span className="text-white/90 tabular-nums">
+                {fmtPrice(item.stop)}
+              </span>
             </span>
           )}
           {item.target != null && (
             <span>
-              Target <span className="text-white/90">{item.target}</span>
+              Target{" "}
+              <span className="text-white/90 tabular-nums">
+                {fmtPrice(item.target)}
+              </span>
             </span>
           )}
           {itemRr != null && (

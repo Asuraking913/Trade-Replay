@@ -11,12 +11,17 @@ interface EntryListProps {
   onDelete: (id: string) => void;
 }
 
+const MAX_VISIBLE = 10;
+
 export default function EntryList({
   entries,
   hydrated,
   error,
   onDelete,
 }: EntryListProps) {
+  const visibleEntries = entries.slice(0, MAX_VISIBLE);
+  const hiddenCount = entries.length - visibleEntries.length;
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 24 }}
@@ -55,10 +60,23 @@ export default function EntryList({
       ) : (
         <div className="space-y-3">
           <AnimatePresence initial={false}>
-            {entries.map((item) => (
+            {visibleEntries.map((item) => (
               <EntryCard key={item.id} item={item} onDelete={onDelete} />
             ))}
           </AnimatePresence>
+
+          {hiddenCount > 0 && (
+            <Link
+              href="/journal/entries"
+              className="flex items-center justify-center gap-1.5 rounded-2xl border border-white/12 py-3 text-sm text-white/60 hover:text-white hover:border-white/25 transition-colors"
+            >
+              View {hiddenCount} more {hiddenCount === 1 ? "plan" : "plans"}
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="12 5 19 12 12 19" />
+              </svg>
+            </Link>
+          )}
         </div>
       )}
     </motion.div>
